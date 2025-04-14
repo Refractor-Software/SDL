@@ -63,6 +63,8 @@
 #define SDL_DYNAMIC_API 0 // vitasdk doesn't support dynamic linking
 #elif defined(SDL_PLATFORM_3DS)
 #define SDL_DYNAMIC_API 0 // devkitARM doesn't support dynamic linking
+#elif defined(_DEBUG)
+#define SDL_DYNAMIC_API 0 // @REFRACT: Disable dynamic API in debug builds
 #elif defined(DYNAPI_NEEDS_DLOPEN) && !defined(HAVE_DLOPEN)
 #define SDL_DYNAMIC_API 0 // we need dlopen(), but don't have it....
 #endif
