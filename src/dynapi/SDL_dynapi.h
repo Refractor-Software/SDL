@@ -63,15 +63,16 @@
 #define SDL_DYNAMIC_API 0 // vitasdk doesn't support dynamic linking
 #elif defined(SDL_PLATFORM_3DS)
 #define SDL_DYNAMIC_API 0 // devkitARM doesn't support dynamic linking
-#elif defined(_DEBUG)
-#define SDL_DYNAMIC_API 0 // @REFRACT: Disable dynamic API in debug builds
 #elif defined(DYNAPI_NEEDS_DLOPEN) && !defined(HAVE_DLOPEN)
 #define SDL_DYNAMIC_API 0 // we need dlopen(), but don't have it....
 #endif
 
 // everyone else. This is where we turn on the API if nothing forced it off.
+
+// @REFRACT: SDL isn't the only platform-level library we depend on. If SDL breaks, there's a good chance other libraries broke, too.
+// At that point, we might as well update the whole game. The engine is open-source, and we also ship engine updates to old games when new ones are released.
 #ifndef SDL_DYNAMIC_API
-#define SDL_DYNAMIC_API 1
+#define SDL_DYNAMIC_API 0
 #endif
 
 #endif
