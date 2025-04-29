@@ -114,7 +114,7 @@ typedef struct
     bool has_position;
     bool relative_mode;
     bool relative_mode_warp_motion;
-    bool relative_mode_cursor_visible;
+    bool relative_mode_hide_cursor;
     bool relative_mode_center;
     bool warp_emulation_hint;
     bool warp_emulation_active;
@@ -148,7 +148,7 @@ typedef struct
     SDL_Cursor *cursors;
     SDL_Cursor *def_cursor;
     SDL_Cursor *cur_cursor;
-    bool cursor_shown;
+    bool cursor_visible;
 
     // Driver-dependent data.
     void *internal;
@@ -174,6 +174,9 @@ extern void SDL_SetMouseName(SDL_MouseID mouseID, const char *name);
 
 // Get the mouse state structure
 extern SDL_Mouse *SDL_GetMouse(void);
+
+// Set the default mouse cursor
+extern void SDL_RedrawCursor(void);
 
 // Set the default mouse cursor
 extern void SDL_SetDefaultCursor(SDL_Cursor *cursor);

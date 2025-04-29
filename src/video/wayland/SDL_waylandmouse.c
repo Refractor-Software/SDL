@@ -196,7 +196,7 @@ static DBusHandlerResult Wayland_DBusCursorMessageFilter(DBusConnection *conn, D
 
             if (dbus_cursor_size != new_cursor_size) {
                 dbus_cursor_size = new_cursor_size;
-                SDL_SetCursor(NULL); // Force cursor update
+                SDL_RedrawCursor(); // Force cursor update
             }
         } else if (SDL_strcmp(CURSOR_THEME_KEY, key) == 0) {
             const char *new_cursor_theme = NULL;
@@ -223,7 +223,7 @@ static DBusHandlerResult Wayland_DBusCursorMessageFilter(DBusConnection *conn, D
 
                 // Purge the current cached themes and force a cursor refresh.
                 Wayland_FreeCursorThemes(vdata);
-                SDL_SetCursor(NULL);
+                SDL_RedrawCursor();
             }
         } else {
             goto not_our_signal;
@@ -1025,7 +1025,7 @@ void Wayland_RecreateCursors(void)
     }
     if (mouse->cur_cursor) {
         Wayland_RecreateCursor(mouse->cur_cursor, vdata);
-        if (mouse->cursor_shown) {
+        if (mouse->cursor_visible) {
             Wayland_ShowCursor(mouse->cur_cursor);
         }
     }
@@ -1118,7 +1118,7 @@ void Wayland_SeatUpdateCursor(SDL_WaylandSeat *seat)
     if (pointer_focus) {
         const bool has_relative_focus = Wayland_SeatHasRelativePointerFocus(seat);
 
-        if (!seat->display->relative_mode_enabled || !has_relative_focus || mouse->relative_mode_cursor_visible) {
+        if (!seat->display->relative_mode_enabled || !has_relative_focus || !mouse->relative_mode_hide_cursor) {
             const SDL_HitTestResult rc = pointer_focus->hit_test_result;
 
             if ((seat->display->relative_mode_enabled && has_relative_focus) ||
