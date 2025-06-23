@@ -771,7 +771,7 @@ static void X11_HandleClipboardEvent(SDL_VideoDevice *_this, const XEvent *xeven
             /* the new mime formats are the SDL_FORMATS property as an array of Atoms */
             Atom atom = None;
             Atom *patom;
-            unsigned char* data = NULL;
+            unsigned char *data = NULL;
             int format_property = 0;
             unsigned long length = 0;
             unsigned long bytes_left = 0;
@@ -780,8 +780,8 @@ static void X11_HandleClipboardEvent(SDL_VideoDevice *_this, const XEvent *xeven
             X11_XGetWindowProperty(display, GetWindow(_this), videodata->atoms.SDL_FORMATS, 0, 200,
                                             0, XA_ATOM, &atom, &format_property, &length, &bytes_left, &data);
 
-            int allocationsize = (length + 1) * sizeof(char*);
-            for (j = 0, patom = (Atom*)data; j < length; j++, patom++) {
+            int allocationsize = (length + 1) * sizeof(char *);
+            for (j = 0, patom = (Atom *)data; j < length; j++, patom++) {
                 char *atomStr = X11_XGetAtomName(display, *patom);
                 allocationsize += SDL_strlen(atomStr) + 1;
                 X11_XFree(atomStr);
@@ -791,7 +791,7 @@ static void X11_HandleClipboardEvent(SDL_VideoDevice *_this, const XEvent *xeven
             if (new_mime_types) {
                 char *strPtr = (char *)(new_mime_types + length + 1);
 
-                for (j = 0, patom = (Atom*)data; j < length; j++, patom++) {
+                for (j = 0, patom = (Atom *)data; j < length; j++, patom++) {
                     char *atomStr = X11_XGetAtomName(display, *patom);
                     new_mime_types[j] = strPtr;
                     strPtr = stpcpy(strPtr, atomStr) + 1;
@@ -987,26 +987,29 @@ void X11_HandleKeyEvent(SDL_VideoDevice *_this, SDL_WindowData *windowdata, SDL_
         }
     }
 
+    if (!handled_by_ime) {
+        if (pressed) {
+            X11_HandleModifierKeys(videodata, scancode, true, true);
+            SDL_SendKeyboardKeyIgnoreModifiers(timestamp, keyboardID, keycode, scancode, true);
+
+            if (*text && !(SDL_GetModState() & (SDL_KMOD_CTRL | SDL_KMOD_ALT))) {
+                text[text_length] = '\0';
+                X11_ClearComposition(windowdata);
+                SDL_SendKeyboardText(text);
+            }
+        } else {
+            if (X11_KeyRepeat(display, xevent)) {
+                // We're about to get a repeated key down, ignore the key up
+                return;
+            }
+
+            X11_HandleModifierKeys(videodata, scancode, false, true);
+            SDL_SendKeyboardKeyIgnoreModifiers(timestamp, keyboardID, keycode, scancode, false);
+        }
+    }
+
     if (pressed) {
-        X11_HandleModifierKeys(videodata, scancode, true, true);
-        SDL_SendKeyboardKeyIgnoreModifiers(timestamp, keyboardID, keycode, scancode, true);
-
-        // Synthesize a text event if the IME didn't consume a printable character
-        if (*text && !(SDL_GetModState() & (SDL_KMOD_CTRL | SDL_KMOD_ALT))) {
-            text[text_length] = '\0';
-            X11_ClearComposition(windowdata);
-            SDL_SendKeyboardText(text);
-        }
-
         X11_UpdateUserTime(windowdata, xevent->xkey.time);
-    } else {
-        if (X11_KeyRepeat(display, xevent)) {
-            // We're about to get a repeated key down, ignore the key up
-            return;
-        }
-
-        X11_HandleModifierKeys(videodata, scancode, false, true);
-        SDL_SendKeyboardKeyIgnoreModifiers(timestamp, keyboardID, keycode, scancode, false);
     }
 }
 

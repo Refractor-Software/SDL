@@ -33,6 +33,7 @@
 #include "../SDL_sysvideo.h"
 
 #include "SDL_windowsvideo.h"
+#include "SDL_windowskeyboard.h"
 #include "SDL_windowswindow.h"
 
 // Dropfile support
@@ -185,7 +186,7 @@ static DWORD GetWindowStyleEx(SDL_Window *window)
 }
 
 #ifdef HAVE_SHOBJIDL_CORE_H
-static ITaskbarList3 *GetTaskbarList(SDL_Window* window)
+static ITaskbarList3 *GetTaskbarList(SDL_Window *window)
 {
     const SDL_WindowData *data = window->internal;
     SDL_assert(data->taskbar_button_created);
@@ -779,6 +780,9 @@ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properties
             }
             return false;
         }
+
+        // Ensure that the IME isn't active on the new window until explicitly requested.
+        WIN_StopTextInput(_this, window);
 
         // Inform Windows of the frame change so we can respond to WM_NCCALCSIZE
         SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
@@ -1450,7 +1454,7 @@ void *WIN_GetWindowICCProfile(SDL_VideoDevice *_this, SDL_Window *window, size_t
     char *filename_utf8;
     void *iccProfileData = NULL;
 
-    filename_utf8 = WIN_StringToUTF8(data->ICMFileName);
+    filename_utf8 = WIN_StringToUTF8W(data->ICMFileName);
     if (filename_utf8) {
         iccProfileData = SDL_LoadFile(filename_utf8, size);
         if (!iccProfileData) {
@@ -2061,7 +2065,7 @@ static STDMETHODIMP SDLDropTarget_Drop(SDLDropTarget *target,
                              ". In Drop Text for   GlobalLock, format %08x '%s', memory (%lu) %p",
                              fetc.cfFormat, format_mime, (unsigned long)bsize, buffer);
                 if (buffer) {
-                    buffer = WIN_StringToUTF8((const wchar_t *)buffer);
+                    buffer = WIN_StringToUTF8W((const wchar_t *)buffer);
                     if (buffer) {
                         const size_t lbuffer = SDL_strlen((const char *)buffer);
                         SDL_LogTrace(SDL_LOG_CATEGORY_INPUT,
@@ -2208,8 +2212,8 @@ void WIN_AcceptDragAndDrop(SDL_Window *window, bool accept)
                 drop_target->lpVtbl = vtDropTarget;
                 drop_target->window = window;
                 drop_target->hwnd = data->hwnd;
-                drop_target->format_file = RegisterClipboardFormat(L"text/uri-list");
-                drop_target->format_text = RegisterClipboardFormat(L"text/plain;charset=utf-8");
+                drop_target->format_file = RegisterClipboardFormatW(L"text/uri-list");
+                drop_target->format_text = RegisterClipboardFormatW(L"text/plain;charset=utf-8");
                 data->drop_target = drop_target;
                 SDLDropTarget_AddRef(drop_target);
                 RegisterDragDrop(data->hwnd, (LPDROPTARGET)drop_target);
@@ -2260,7 +2264,7 @@ bool WIN_FlashWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_FlashOperat
     return true;
 }
 
-bool WIN_ApplyWindowProgress(SDL_VideoDevice *_this, SDL_Window* window)
+bool WIN_ApplyWindowProgress(SDL_VideoDevice *_this, SDL_Window *window)
 {
 #ifdef HAVE_SHOBJIDL_CORE_H
     SDL_WindowData *data = window->internal;
