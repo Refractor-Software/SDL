@@ -2500,6 +2500,10 @@ extern "C" {
  * This defaults to 0, and specifying NULL for the hint's value will restore
  * the default.
  *
+ * This doesn't have to be an integer value. For example, "59.94" won't be
+ * rounded to an integer rate; the digits after the decimal are actually
+ * respected.
+ *
  * This hint can be set anytime.
  *
  * \since This hint is available since SDL 3.2.0.
@@ -4377,6 +4381,27 @@ extern "C" {
  */
 #define SDL_HINT_PEN_TOUCH_EVENTS "SDL_PEN_TOUCH_EVENTS"
 
+/**
+ * A variable controlling whether SDL backend information is logged.
+ *
+ * The variable can be set to the following values:
+ *
+ * - "0": Subsystem information will not be logged. (default)
+ * - "1": Subsystem information will be logged.
+ *
+ * This is generally meant to be used as an environment variable to let
+ * end-users report what subsystems were chosen on their system, to aid in
+ * debugging. Logged information is sent through SDL_Log(), which means by
+ * default they appear on stdout on most platforms or maybe
+ * OutputDebugString() on Windows, and can be funneled by the app with
+ * SDL_SetLogOutputFunction(), etc.
+ *
+ * This hint can be set anytime, but the specific logs are generated during
+ * subsystem init.
+ *
+ * \since This hint is available since SDL 3.4.0.
+ */
+#define SDL_HINT_LOG_BACKENDS "SDL_LOG_BACKENDS"
 
 /**
  * An enumeration of hint priorities.
