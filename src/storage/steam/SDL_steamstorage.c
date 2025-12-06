@@ -23,6 +23,23 @@
 
 #include "../SDL_sysstorage.h"
 
+#if defined(_WIN64)
+#define SDL_DRIVER_STEAMAPI_DYNAMIC "steam_api64.dll"
+#elif defined(_WIN32)
+#define SDL_DRIVER_STEAMAPI_DYNAMIC "steam_api.dll"
+#elif defined(__APPLE__)
+#define SDL_DRIVER_STEAMAPI_DYNAMIC "libsteam_api.dylib"
+#else
+#define SDL_DRIVER_STEAMAPI_DYNAMIC "libsteam_api.so"
+#endif
+
+SDL_ELF_NOTE_DLOPEN(
+    "storage-steam",
+    "Support for Steam user storage",
+    SDL_ELF_NOTE_DLOPEN_PRIORITY_SUGGESTED,
+    SDL_DRIVER_STEAMAPI_DYNAMIC
+);
+
 // !!! FIXME: Async API can use SteamRemoteStorage_ReadFileAsync
 // !!! FIXME: Async API can use SteamRemoteStorage_WriteFileAsync
 
@@ -88,7 +105,7 @@ static bool STEAM_ReadStorageFile(void *userdata, const char *path, void *destin
     if (steam->SteamAPI_ISteamRemoteStorage_FileRead(steamremotestorage, path, destination, (Sint32) length) == length) {
         result = true;
     } else {
-        SDL_SetError("SteamAPI_ISteamRemoteStorage_FileRead() failed");
+        SDL_SetError("SteamRemoteStorage()->FileRead() failed");
     }
     return result;
 }
@@ -107,7 +124,7 @@ static bool STEAM_WriteStorageFile(void *userdata, const char *path, const void 
     if (steam->SteamAPI_ISteamRemoteStorage_FileWrite(steamremotestorage, path, source, (Sint32) length) == length) {
         result = true;
     } else {
-        SDL_SetError("SteamAPI_ISteamRemoteStorage_FileRead() failed");
+        SDL_SetError("SteamRemoteStorage()->FileWrite() failed");
     }
     return result;
 }
@@ -122,7 +139,7 @@ static Uint64 STEAM_GetStorageSpaceRemaining(void *userdata)
         return 0;
     }
     if (!steam->SteamAPI_ISteamRemoteStorage_GetQuota(steamremotestorage, &total, &remaining)) {
-        SDL_SetError("SteamRemoteStorage()->GetQuota failed");
+        SDL_SetError("SteamRemoteStorage()->GetQuota() failed");
         return 0;
     }
     return remaining;
@@ -154,17 +171,7 @@ static SDL_Storage *STEAM_User_Create(const char *org, const char *app, SDL_Prop
         return NULL;
     }
 
-    steam->libsteam_api = SDL_LoadObject(
-#if defined(_WIN64)
-        "steam_api64.dll"
-#elif defined(_WIN32)
-        "steam_api.dll"
-#elif defined(__APPLE__)
-        "libsteam_api.dylib"
-#else
-        "libsteam_api.so"
-#endif
-    );
+    steam->libsteam_api = SDL_LoadObject(SDL_DRIVER_STEAMAPI_DYNAMIC);
     if (steam->libsteam_api == NULL) {
         SDL_free(steam);
         return NULL;
@@ -192,7 +199,7 @@ static SDL_Storage *STEAM_User_Create(const char *org, const char *app, SDL_Prop
         goto steamfail;
     }
     if (!steam->SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(steamremotestorage)) {
-        SDL_SetError("SteamRemoteStorage()->BeginFileWriteBatch failed");
+        SDL_SetError("SteamRemoteStorage()->BeginFileWriteBatch() failed");
         goto steamfail;
     }
 

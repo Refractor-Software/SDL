@@ -85,6 +85,7 @@ typedef unsigned int uintptr_t;
 #define HAVE_DXGI_H 1
 #define HAVE_XINPUT_H 1
 #if defined(_WIN32_MAXVER) && _WIN32_MAXVER >= 0x0A00  /* Windows 10 SDK */
+#define HAVE_DXGI1_5_H 1
 #define HAVE_DXGI1_6_H 1
 #define HAVE_WINDOWS_GAMING_INPUT_H 1
 #endif
@@ -94,9 +95,6 @@ typedef unsigned int uintptr_t;
 #endif
 #if defined(_WIN32_MAXVER) && _WIN32_MAXVER >= 0x0603  /* Windows 8.1 SDK */
 #define HAVE_SHELLSCALINGAPI_H 1
-#endif
-#if defined(_WIN32_MAXVER) && _WIN32_MAXVER >= 0x0601  /* Windows 7 SDK */
-#define HAVE_SHOBJIDL_CORE_H 1
 #endif
 #define HAVE_MMDEVICEAPI_H 1
 #define HAVE_AUDIOCLIENT_H 1
