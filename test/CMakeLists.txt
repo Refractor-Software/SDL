@@ -88,9 +88,13 @@ foreach(resource_file IN LISTS RESOURCE_FILES)
     get_filename_component(res_file_name ${resource_file} NAME)
     list(APPEND RESOURCE_FILE_NAMES "${res_file_name}")
     set(resource_file_bindir "${test_bin_dir}/${res_file_name}")
+    set(depends_resource_file "${resource_file}")
+    if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
+        set(depends_resource_file "${CMAKE_CURRENT_LIST_FILE}")
+    endif()
     add_custom_command(OUTPUT "${resource_file_bindir}"
         COMMAND "${CMAKE_COMMAND}" -E copy "${resource_file}" "${resource_file_bindir}"
-        DEPENDS "${resource_file}"
+        DEPENDS "${depends_resource_file}"
     )
     list(APPEND RESOURCE_FILES_BINDIR "${resource_file_bindir}")
 endforeach()
@@ -101,6 +105,21 @@ add_custom_target(copy-sdl-test-resources
 define_property(TARGET PROPERTY SDL_NONINTERACTIVE BRIEF_DOCS "If true, target is a non-interactive test executable." FULL_DOCS "If true, target is a noninteractive test executable.")
 define_property(TARGET PROPERTY SDL_NONINTERACTIVE_ARGUMENTS BRIEF_DOCS "Argument(s) to run executable in non-interactive mode." FULL_DOCS "Argument(s) to run executable in non-interactive mode.")
 define_property(TARGET PROPERTY SDL_NONINTERACTIVE_TIMEOUT BRIEF_DOCS "Timeout for noninteractive executable." FULL_DOCS "Timeout for noninteractive executable.")
+
+if(HAVE_X11)
+    find_package(X11 QUIET)
+    if(NOT TARGET X11::X11)
+        set(HAVE_X11 OFF)
+    endif()
+endif()
+
+if(HAVE_WAYLAND)
+    find_package(PkgConfig QUIET)
+    pkg_check_modules(PkgWaylandClient QUIET IMPORTED_TARGET wayland-client)
+    if(NOT TARGET PkgConfig::PkgWaylandClient)
+        set(HAVE_WAYLAND OFF)
+    endif()
+endif()
 
 function(add_sdl_test_executable TARGET)
     cmake_parse_arguments(AST "BUILD_DEPENDENT;NONINTERACTIVE;NEEDS_RESOURCES;TESTUTILS;THREADS;MAIN_CALLBACKS;NOTRACKMEM" "" "DEPENDS;DISABLE_THREADS_ARGS;NONINTERACTIVE_TIMEOUT;NONINTERACTIVE_ARGS;INSTALLED_ARGS;SOURCES" ${ARGN})
@@ -338,15 +357,15 @@ elseif(HAVE_X11 OR HAVE_WAYLAND)
     add_sdl_test_executable(testnative BUILD_DEPENDENT NEEDS_RESOURCES TESTUTILS SOURCES testnative.c)
     if(HAVE_X11)
         target_sources(testnative PRIVATE testnativex11.c)
-        target_link_libraries(testnative PRIVATE X11)
+        target_link_libraries(testnative PRIVATE X11::X11)
     endif()
     if(HAVE_WAYLAND)
         set_property(SOURCE ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c PROPERTY GENERATED 1)
-        target_sources(testnative PRIVATE testnativewayland.c ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c)
+        target_sources(testnative PRIVATE testnativewayland.c "${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c")
 
         # Needed to silence the documentation warning in the generated header file
         target_compile_options(testnative PRIVATE -Wno-documentation-unknown-command)
-        target_link_libraries(testnative PRIVATE wayland-client)
+        target_link_libraries(testnative PRIVATE PkgConfig::PkgWaylandClient)
     endif ()
 endif()
 
@@ -452,7 +471,7 @@ if (HAVE_WAYLAND)
     add_sdl_test_executable(testwaylandcustom NEEDS_RESOURCES SOURCES testwaylandcustom.c ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c)
     # Needed to silence the documentation warning in the generated header file
     target_compile_options(testwaylandcustom PRIVATE -Wno-documentation-unknown-command)
-    target_link_libraries(testwaylandcustom PRIVATE wayland-client)
+    target_link_libraries(testwaylandcustom PRIVATE PkgConfig::PkgWaylandClient)
 endif()
 
 check_c_compiler_flag(-Wformat-overflow HAVE_WFORMAT_OVERFLOW)

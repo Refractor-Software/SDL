@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -311,6 +311,11 @@ static BOOL IsWindowsBuildVersionAtLeast(DWORD dwBuildNumber)
     WIN_BuildNumber = (os_info.dwBuildNumber & ~0xF0000000);
     return (WIN_BuildNumber >= dwBuildNumber);
 }
+#else
+static BOOL IsWindowsBuildVersionAtLeast(DWORD dwBuildNumber)
+{
+    return TRUE;
+}
 #endif
 
 // apply some static variables so we only call into the Win32 API once per process for each check.
@@ -324,7 +329,7 @@ static BOOL IsWindowsBuildVersionAtLeast(DWORD dwBuildNumber)
             result = (test); \
             checked = true; \
         } \
-        return result;
+        return result
 #endif
 
 BOOL WIN_IsWine(void)

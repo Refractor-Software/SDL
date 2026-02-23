@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -50,6 +50,7 @@ static SDL_FullscreenResult Emscripten_SetWindowFullscreen(SDL_VideoDevice *_thi
 static void Emscripten_PumpEvents(SDL_VideoDevice *_this);
 static void Emscripten_SetWindowTitle(SDL_VideoDevice *_this, SDL_Window *window);
 static bool Emscripten_SetWindowIcon(SDL_VideoDevice *_this, SDL_Window *window, SDL_Surface *icon);
+static bool Emscripten_SetWindowFillDocument(SDL_VideoDevice *_this, SDL_Window *window, bool fill);
 
 SDL_Window *Emscripten_fill_document_window = NULL;
 
@@ -58,11 +59,8 @@ static int pending_swap_interval = -1;
 
 // Emscripten driver bootstrap functions
 
-static void SDLCALL Emscripten_FillDocHintChanged(void *userdata, const char *name, const char *oldValue, const char *hint);
-
 static void Emscripten_DeleteDevice(SDL_VideoDevice *device)
 {
-    SDL_RemoveHintCallback(SDL_HINT_EMSCRIPTEN_FILL_DOCUMENT, Emscripten_FillDocHintChanged, device);
     SDL_free(device);
 }
 
@@ -103,10 +101,6 @@ static void Emscripten_ListenSystemTheme(void)
 {
     MAIN_THREAD_EM_ASM({
         if (window.matchMedia) {
-            if (typeof(Module['SDL3']) === 'undefined') {
-                Module['SDL3'] = {};
-            }
-
             var SDL3 = Module['SDL3'];
 
             SDL3.eventHandlerThemeChanged = function(event) {
@@ -177,6 +171,7 @@ static SDL_VideoDevice *Emscripten_CreateDevice(void)
     device->GetWindowSizeInPixels = Emscripten_GetWindowSizeInPixels;
     device->DestroyWindow = Emscripten_DestroyWindow;
     device->SetWindowFullscreen = Emscripten_SetWindowFullscreen;
+    device->SetWindowFillDocument = Emscripten_SetWindowFillDocument;
 
     device->CreateWindowFramebuffer = Emscripten_CreateWindowFramebuffer;
     device->UpdateWindowFramebuffer = Emscripten_UpdateWindowFramebuffer;
@@ -196,8 +191,6 @@ static SDL_VideoDevice *Emscripten_CreateDevice(void)
 
     Emscripten_ListenSystemTheme();
     device->system_theme = Emscripten_GetSystemTheme();
-
-    SDL_AddHintCallback(SDL_HINT_EMSCRIPTEN_FILL_DOCUMENT, Emscripten_FillDocHintChanged, device);
 
     return device;
 }
@@ -463,14 +456,16 @@ EMSCRIPTEN_KEEPALIVE void requestFullscreenThroughSDL(SDL_Window *window)
     SDL_SetWindowFullscreen(window, true);
 }
 
-static void Emscripten_SetWindowFillDocState(SDL_Window *window, bool enable)
+static bool Emscripten_SetWindowFillDocument(SDL_VideoDevice *_this, SDL_Window *window, bool fill)
 {
     SDL_WindowData *wdata = window->internal;
 
-    SDL_assert(!Emscripten_fill_document_window || !enable); // one at a time, sorry.
+    if (fill && Emscripten_fill_document_window && (Emscripten_fill_document_window != window)) {
+        return SDL_SetError("Only one fill-document window allowed at a time.");
+    }
 
     // fill_document takes up the entire page and resizes as the browser window resizes.
-    if (enable) {
+    if (fill) {
         Emscripten_fill_document_window = window;
 
         const int w = MAIN_THREAD_EM_ASM_INT({ return window.innerWidth; });
@@ -558,20 +553,8 @@ static void Emscripten_SetWindowFillDocState(SDL_Window *window, bool enable)
             SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, wdata->non_fill_document_width, wdata->non_fill_document_height);
         }
     }
-}
 
-static void SDLCALL Emscripten_FillDocHintChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
-{
-    const bool enabled = SDL_GetStringBoolean(hint, false);
-    if (Emscripten_fill_document_window && !enabled) {
-        Emscripten_SetWindowFillDocState(Emscripten_fill_document_window, false);
-    } else if (!Emscripten_fill_document_window && enabled) {
-        /// there's currently only ever one canvas, but if this changes later, we can choose the one with keyboard focus or something.
-        SDL_VideoDevice *device = (SDL_VideoDevice *) userdata;
-        if (device && device->windows) {  // take first window in the list for now.
-            Emscripten_SetWindowFillDocState(device->windows, true);
-        }
-    }
+    return true;
 }
 
 static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID props)
@@ -579,6 +562,12 @@ static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, 
     SDL_WindowData *wdata;
     double css_w, css_h;
     const char *selector;
+
+    bool fill_document = ((window->flags & SDL_WINDOW_FILL_DOCUMENT) != 0);
+    if (fill_document && Emscripten_fill_document_window) {
+        fill_document = false;  // only one allowed at a time.
+        window->flags &= ~SDL_WINDOW_FILL_DOCUMENT;   // !!! FIXME: should this fail instead?
+    }
 
     // Allocate window internal data
     wdata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
@@ -598,15 +587,6 @@ static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, 
     }
     wdata->keyboard_element = SDL_strdup(selector);
 
-    bool fill_document;
-    if (Emscripten_fill_document_window) {
-        fill_document = false;  // only one allowed at a time.
-    } else if (SDL_GetHint(SDL_HINT_EMSCRIPTEN_FILL_DOCUMENT)) {
-        fill_document = SDL_GetHintBoolean(SDL_HINT_EMSCRIPTEN_FILL_DOCUMENT, false);
-    } else {
-        fill_document = SDL_GetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_EMSCRIPTEN_FILL_DOCUMENT_BOOLEAN, false);
-    }
-
     if (window->flags & SDL_WINDOW_HIGH_PIXEL_DENSITY) {
         wdata->pixel_ratio = emscripten_get_device_pixel_ratio();
     } else {
@@ -620,6 +600,8 @@ static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, 
     wdata->external_size = SDL_floor(css_w) != 1 || SDL_floor(css_h) != 1;
     if (wdata->external_size) {
         fill_document = false;  // can't be resizable if something else is controlling it.
+        window->w = (int) css_w;
+        window->h = (int) css_h;
     }
 
     wdata->window = window;
@@ -629,7 +611,7 @@ static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, 
 
     wdata->non_fill_document_width = window->w;
     wdata->non_fill_document_height = window->h;
-    Emscripten_SetWindowFillDocState(window, fill_document);
+    Emscripten_SetWindowFillDocument(_this, window, fill_document);
 
     // One window, it always has focus
     SDL_SetMouseFocus(window);
@@ -647,7 +629,6 @@ static bool Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, 
     // Ensure various things are added to the window's properties
     SDL_SetStringProperty(window->props, SDL_PROP_WINDOW_EMSCRIPTEN_CANVAS_ID_STRING, wdata->canvas_id);
     SDL_SetStringProperty(window->props, SDL_PROP_WINDOW_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING, wdata->keyboard_element);
-    SDL_SetBooleanProperty(window->props, SDL_PROP_WINDOW_EMSCRIPTEN_FILL_DOCUMENT_BOOLEAN, fill_document);
 
     // Window has been successfully created
     return true;
@@ -695,9 +676,7 @@ static void Emscripten_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
 {
     SDL_WindowData *data;
 
-    if (Emscripten_fill_document_window == window) {
-        Emscripten_SetWindowFillDocState(window, false);
-    }
+    Emscripten_SetWindowFillDocument(_this, window, false);
 
     if (window->internal) {
         data = window->internal;
@@ -811,7 +790,10 @@ static bool Emscripten_SetWindowIcon(SDL_VideoDevice *_this, SDL_Window *window,
 
     // Pass PNG data to JavaScript
     MAIN_THREAD_EM_ASM({
-        var pngData = HEAPU8.subarray($0, $0 + $1);
+        // Use `.slice` to make a copy of the data if we are dealing with a SharedArrayBuffer, or `.subarray` to create a
+        // view into the existing buffer if its non-shared.
+        var pngData = HEAPU8.buffer instanceof ArrayBuffer ? HEAPU8.subarray($0, $0 + $1) : HEAPU8.slice($0, $0 + $1);
+
         var blob = new Blob([pngData], {type: 'image/png'});
         var url = URL.createObjectURL(blob);
 
