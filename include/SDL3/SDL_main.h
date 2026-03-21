@@ -257,7 +257,7 @@
 #else
 /* usually this is empty */
 #define SDLMAIN_DECLSPEC
-#endif /* SDL_MAIN_EXPORTED */
+#endif /* SDL_WIKI_DOCUMENTATION_SECTION */
 
 #if defined(SDL_MAIN_NEEDED) || defined(SDL_MAIN_AVAILABLE) || defined(SDL_MAIN_USE_CALLBACKS)
 #define main SDL_main
@@ -664,12 +664,28 @@ extern SDL_DECLSPEC void SDLCALL SDL_UnregisterApp(void);
 /**
  * Callback from the application to let the suspend continue.
  *
+ * This should be called in response to an `SDL_EVENT_DID_ENTER_BACKGROUND`
+ * event, which can be detected via event watch. However, do NOT call this
+ * function directly from within an event watch callback. Instead, wait until
+ * the app has suppressed all rendering operations, then call this from the
+ * application render thread.
+ *
+ * When using SDL_Render, this should be called after calling
+ * SDL_GDKSuspendRenderer.
+ *
+ * When using SDL_GPU, this should be called after calling SDL_GDKSuspendGPU.
+ *
+ * If you're writing your own D3D12 renderer, this should be called after
+ * calling `ID3D12CommandQueue::SuspendX`.
+ *
  * This function is only needed for Xbox GDK support; all other platforms will
  * do nothing and set an "unsupported" error message.
  *
  * \threadsafety This function is not thread safe.
  *
  * \since This function is available since SDL 3.2.0.
+ *
+ * \sa SDL_AddEventWatch
  */
 extern SDL_DECLSPEC void SDLCALL SDL_GDKSuspendComplete(void);
 
